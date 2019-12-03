@@ -34,3 +34,19 @@ following:
   </head>
 </html>
 ```
+
+## Docker
+
+The project comes with a `Dockerfile` which you can build an run. The file sets
+the same default values as the compiled program (just for visualization) but you
+can build and run it with your own values.
+
+```sh
+docker build --tag meta-go-imports .
+docker run \
+    -it --rm -p "4080:4080" \
+    -e HTTP_LISTEN=":4080" \
+    -e PACKAGE_PATH="dev.internal.com" \
+    -e CLONE_PATH="git@another.internal.se:7999" \
+    meta-go-imports
+```
