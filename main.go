@@ -28,9 +28,23 @@ const (
 
 func main() {
 	var (
-		httpListen  = kingpin.Flag("http-listen", "The host and/or port to listen on").Default(":4080").Envar("HTTP_LISTEN").String()
-		packagePath = kingpin.Flag("package-path", "The default path for the package").Default("github.com").Envar("PACKAGE_PATH").String()
-		clonePath   = kingpin.Flag("clone-path", "The default path to clone the package").Default("https://github.com").Envar("CLONE_PATH").String()
+		httpListen = kingpin.
+				Flag("http-listen", "The host and/or port to listen on").
+				Default(":4080").
+				Envar("HTTP_LISTEN").
+				String()
+
+		packagePath = kingpin.
+				Flag("package-path", "The default path for the package").
+				Default("github.com").
+				Envar("PACKAGE_PATH").
+				String()
+
+		clonePath = kingpin.
+				Flag("clone-path", "The default path to clone the package").
+				Default("https://github.com").
+				Envar("CLONE_PATH").
+				String()
 	)
 
 	kingpin.Parse()
@@ -97,7 +111,10 @@ func main() {
 		logrus.New(),   // Optional logger
 	)
 
-	logger.Infof("will create meta tag for all packages under %s and point to %s", *packagePath, *clonePath)
+	logger.Infof(
+		"will create meta tag for all packages under %s and point to %s",
+		*packagePath, *clonePath,
+	)
 	logger.Infof("listening on '%s'\n", *httpListen)
 
 	if err := s.ListenAndServe(); err != nil {
