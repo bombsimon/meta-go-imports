@@ -19,9 +19,14 @@ path and where to clone.
 go build -o meta-go-imports main.go
 ./meta-go-imports \
     --http-listen ":4080" \
-    --package-path "dev.internal.com" \
-    --clone-path  "git@another.internal.se:7999"
+    --package-path "dev.internal.se" \
+    --clone-path "git+ssh://git@another.internal.se:7999" \
+    --cert-file "/path/to/cert.pem" \
+    --key-file "/path/to/key.pem
 ```
+
+You can ommit `--cert-file` and `--key-file` if you don't want to use TLS, but
+then you must add `-insecure` when running `go get`.
 
 When you try to fetch `some-package` from `some-project` with something like
 `dev.internal.se/some-project/some-package`, the server will respond with the
@@ -30,7 +35,7 @@ following:
 ```html
 <html>
   <head>
-    <meta name="go-import" content="dev.internal.com/some-project/some-package git git@another.internal.se:7999:some-project/some-package.git">
+    <meta name="go-import" content="dev.internal.se/some-project/some-package git git+ssh://git@another.internal.se:7999/some-project/some-package.git">
   </head>
 </html>
 ```
@@ -46,7 +51,10 @@ docker build --tag meta-go-imports .
 docker run \
     -it --rm -p "4080:4080" \
     -e HTTP_LISTEN=":4080" \
-    -e PACKAGE_PATH="dev.internal.com" \
-    -e CLONE_PATH="git@another.internal.se:7999" \
-    meta-go-imports
+    -e PACKAGE_PATH="dev.internal.se" \
+    -e CLONE_PATH="git+ssh://git@another.internal.se:7999" \
+    -e CERT_FILE="/certificates/cert.pem" \
+    -e KEY_FILE="/certificates/key.pem" \
+    -v $(pwd)/certificates:/certificates \
+    bombsimon/meta-go-imports
 ```

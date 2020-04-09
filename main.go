@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/alecthomas/kingpin"
@@ -14,14 +13,9 @@ import (
 )
 
 const (
-	projectSeparatorSlash = "/"
-	projectSeparatorColon = ":"
-)
-
-const (
 	htmlContent = `<html>
   <head>
-    <meta name="go-import" content="%s/%s/%s git %s%s%s/%s.git">
+    <meta name="go-import" content="%s/%s/%s git %s/%s/%s.git">
   </head>
 </html>`
 )
@@ -45,6 +39,16 @@ func main() {
 				Default("https://github.com").
 				Envar("CLONE_PATH").
 				String()
+
+		certFile = kingpin.
+				Flag("cert-file", "Path to the certificate for TLS").
+				Envar("CERT_FILE").
+				String()
+
+		keyFile = kingpin.
+			Flag("key-file", "Path to the key file for TLS").
+			Envar("KEY_FILE").
+			String()
 	)
 
 	kingpin.Parse()
@@ -56,12 +60,7 @@ func main() {
 			"pkg":    *packagePath,
 			"clone":  *clonePath,
 		})
-		separator = projectSeparatorSlash
 	)
-
-	if !strings.HasPrefix(*clonePath, "http") {
-		separator = projectSeparatorColon
-	}
 
 	r.HandleFunc("/{project}/{pkg}", func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
@@ -88,7 +87,6 @@ func main() {
 			project,
 			pkg,
 			*clonePath,
-			separator,
 			project,
 			pkg,
 		)
@@ -115,10 +113,19 @@ func main() {
 		"will create meta tag for all packages under %s and point to %s",
 		*packagePath, *clonePath,
 	)
-	logger.Infof("listening on '%s'\n", *httpListen)
 
-	if err := s.ListenAndServe(); err != nil {
-		logger.Fatal(err)
+	withTLS := *certFile != "" && *keyFile != ""
+
+	logger.Infof("listening on '%s', TLS: '%v'\n", *httpListen, withTLS)
+
+	if withTLS {
+		if err := s.ListenAndServeTLS(*certFile, *keyFile); err != nil {
+			logger.Fatal(err)
+		}
+	} else {
+		if err := s.ListenAndServe(); err != nil {
+			logger.Fatal(err)
+		}
 	}
 
 	<-idleConnsClosed
