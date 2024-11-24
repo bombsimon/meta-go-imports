@@ -5,7 +5,10 @@ page with a `go-import` meta tag. This can be found e.g. at
 [GitHub](https://github.com) and looks something like this:
 
 ```html
-<meta name="go-import" content="github.com/user/package git https://github.com/user/package.git">
+<meta
+  name="go-import"
+  content="github.com/user/package git https://github.com/user/package.git"
+/>
 ```
 
 If you want to host your internal packages and ensure that you can run `go get`
@@ -35,7 +38,10 @@ following:
 ```html
 <html>
   <head>
-    <meta name="go-import" content="dev.internal.se/some-project/some-package git git+ssh://git@another.internal.se:7999/some-project/some-package.git">
+    <meta
+      name="go-import"
+      content="dev.internal.se/some-project/some-package git git+ssh://git@another.internal.se:7999/some-project/some-package.git"
+    />
   </head>
 </html>
 ```
@@ -57,4 +63,20 @@ docker run \
     -e KEY_FILE="/certificates/key.pem" \
     -v $(pwd)/certificates:/certificates \
     bombsimon/meta-go-imports
+```
+
+### Downloading
+
+The image is also hosted both on
+[Dockerhub](https://hub.docker.com/repository/docker/bombsimon/meta-go-imports/general)
+and
+[GitHub](https://github.com/users/bombsimon/packages/container/package/meta-go-imports)
+so you can download it without building the image yourslef.
+
+```sh
+# From Docker Hub
+docker run bombsimon/meta-go-imports
+
+# From GitHub
+docker run ghcr.io/bombsimon/meta-go-imports
 ```
