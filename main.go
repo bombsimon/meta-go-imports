@@ -1,67 +1,97 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
-	"github.com/alecthomas/kingpin"
 	"github.com/bombsimon/http-helpers/middleware"
 	"github.com/bombsimon/http-helpers/server"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	htmlContent = `<html>
+const htmlContent = `<html>
   <head>
     <meta name="go-import" content="%s/%s/%s git %s/%s/%s.git">
   </head>
 </html>`
-)
+
+type config struct {
+	httpListen  string
+	packagePath string
+	clonePath   string
+	certFile    string
+	keyFile     string
+}
+
+func envOrDefault(env string, defaultValue string) string {
+	if v := os.Getenv(env); v != "" {
+		return v
+	}
+
+	return defaultValue
+}
 
 func main() {
-	var (
-		httpListen = kingpin.
-				Flag("http-listen", "The host and/or port to listen on").
-				Default(":4080").
-				Envar("HTTP_LISTEN").
-				String()
+	cfg := config{}
 
-		packagePath = kingpin.
-				Flag("package-path", "The default path for the package").
-				Default("github.com").
-				Envar("PACKAGE_PATH").
-				String()
+	flag.StringVar(&cfg.httpListen, "http-listen", envOrDefault("HTTP_LISTEN", ":4080"), "The host and/or port to listen on")
+	flag.StringVar(&cfg.packagePath, "package-path", envOrDefault("PACKAGE_PATH", "github.com"), "The default path for the package")
+	flag.StringVar(&cfg.clonePath, "clone-path", envOrDefault("CLONE_PATH", "https://github.com"), "The default path to clone the package")
+	flag.StringVar(&cfg.certFile, "cert-file", os.Getenv("CERT_FILE"), "Path to the certificate for TLS")
+	flag.StringVar(&cfg.keyFile, "key-file", os.Getenv("KEY_FILE"), "Path to the key file for TLS")
+	flag.Parse()
 
-		clonePath = kingpin.
-				Flag("clone-path", "The default path to clone the package").
-				Default("https://github.com").
-				Envar("CLONE_PATH").
-				String()
+	runForever(&cfg)
+}
 
-		certFile = kingpin.
-				Flag("cert-file", "Path to the certificate for TLS").
-				Envar("CERT_FILE").
-				String()
+func runForever(cfg *config) {
+	logger := logrus.New().WithFields(logrus.Fields{
+		"listen": cfg.httpListen,
+		"pkg":    cfg.packagePath,
+		"clone":  cfg.clonePath,
+	})
+	logger.Logger.SetFormatter(&logrus.JSONFormatter{})
 
-		keyFile = kingpin.
-			Flag("key-file", "Path to the key file for TLS").
-			Envar("KEY_FILE").
-			String()
+	httpServer := &http.Server{
+		Addr:    cfg.httpListen,
+		Handler: createHandler(cfg, logger),
+	}
+
+	idleConnsClosed := server.GracefulShutdown(
+		httpServer,
+		10*time.Second,
+		logger,
 	)
 
-	kingpin.Parse()
-
-	var (
-		r      = mux.NewRouter()
-		logger = logrus.New().WithFields(logrus.Fields{
-			"listen": *httpListen,
-			"pkg":    *packagePath,
-			"clone":  *clonePath,
-		})
+	logger.Infof(
+		"will create meta tag for all packages under %s and point to %s",
+		cfg.packagePath,
+		cfg.clonePath,
 	)
 
+	withTLS := cfg.certFile != "" && cfg.keyFile != ""
+
+	logger.WithField("tls", withTLS).Info("server listening")
+
+	if withTLS {
+		if err := httpServer.ListenAndServeTLS(cfg.certFile, cfg.keyFile); err != nil {
+			logger.Fatal(err)
+		}
+	} else {
+		if err := httpServer.ListenAndServe(); err != nil {
+			logger.Fatal(err)
+		}
+	}
+
+	<-idleConnsClosed
+}
+
+func createHandler(cfg *config, logger logrus.FieldLogger) http.Handler {
+	r := mux.NewRouter()
 	r.HandleFunc("/{project}/{pkg}", func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 
@@ -82,51 +112,20 @@ func main() {
 		}
 
 		fmt.Fprintf(
-			w, htmlContent,
-			*packagePath,
+			w,
+			htmlContent,
+			cfg.packagePath,
 			project,
 			pkg,
-			*clonePath,
+			cfg.clonePath,
 			project,
 			pkg,
 		)
 	})
 
-	handlers := middleware.AddMiddlewares(
+	return middleware.AddMiddlewares(
 		r,
 		middleware.PanicRecovery(logger),
 		middleware.Logger(logger),
 	)
-
-	s := &http.Server{
-		Addr:    *httpListen,
-		Handler: handlers,
-	}
-
-	idleConnsClosed := server.GracefulShutdown(
-		s,              // The HTTP server
-		10*time.Second, // Wait time
-		logrus.New(),   // Optional logger
-	)
-
-	logger.Infof(
-		"will create meta tag for all packages under %s and point to %s",
-		*packagePath, *clonePath,
-	)
-
-	withTLS := *certFile != "" && *keyFile != ""
-
-	logger.Infof("listening on '%s', TLS: '%v'\n", *httpListen, withTLS)
-
-	if withTLS {
-		if err := s.ListenAndServeTLS(*certFile, *keyFile); err != nil {
-			logger.Fatal(err)
-		}
-	} else {
-		if err := s.ListenAndServe(); err != nil {
-			logger.Fatal(err)
-		}
-	}
-
-	<-idleConnsClosed
 }
